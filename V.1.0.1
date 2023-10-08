@@ -1,0 +1,51 @@
+import ccxt
+import pandas as pd
+import talib
+
+# Configuración de la plataforma de trading (por ejemplo, Binance)
+exchange = ccxt.binance({
+    'rateLimit': 1200,  # Límite de solicitudes por minuto (ajústalo según tu exchange)
+    'enableRateLimit': True,
+})
+
+# Símbolo y marco de tiempo
+symbol = 'BTC/USDT'
+timeframe = '1h'
+
+# Obtener datos históricos
+ohlcv = exchange.fetch_ohlcv(symbol, timeframe)
+df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+df.set_index('timestamp', inplace=True)
+
+# Calcular las medias móviles exponenciales
+df['ema10'] = talib.EMA(df['close'], timeperiod=10)
+df['ema200'] = talib.EMA(df['close'], timeperiod=200)
+
+# Implementar la estrategia
+position = None
+stop_loss = 30  # Puntos
+take_profit = 30  # Puntos
+
+for i in range(201, len(df)):
+    if df['ema10'][i] > df['ema200'][i] and df['ema10'][i - 1] <= df['ema200'][i - 1]:
+        # Señal de compra
+        if position != 'buy':
+            # Abre una posición de compra
+            entry_price = df['close'][i]
+            stop_loss_price = entry_price - stop_loss
+            take_profit_price = entry_price + take_profit
+            position = 'buy'
+            print(f'Compra a {entry_price:.2f} - Stop Loss a {stop_loss_price:.2f} - Take Profit a {take_profit_price:.2f}')
+
+    elif df['ema10'][i] < df['ema200'][i] and df['ema10'][i - 1] >= df['ema200'][i - 1]:
+        # Señal de venta
+        if position != 'sell':
+            # Abre una posición de venta
+            entry_price = df['close'][i]
+            stop_loss_price = entry_price + stop_loss
+            take_profit_price = entry_price - take_profit
+            position = 'sell'
+            print(f'Venta a {entry_price:.2f} - Stop Loss a {stop_loss_price:.2f} - Take Profit a {take_profit_price:.2f}')
+
+# Nota: Esta implementación es un ejemplo básico y no incluye la ejecución de órdenes en una cuenta real.
